@@ -1,40 +1,42 @@
 <?php
-
-set_include_path(get_include_path() . PATH_SEPARATOR . 'google-api-php-client/src');
-
-require_once 'Google_Client.php';
-require_once 'contrib/Google_DriveService.php';
-
+include_once __DIR__ . '/vendor/autoload.php';
 require_once './GoogleDriveStreamWrapper.php';
 
+session_start();
+$redirect_uri = 'http://' . $_SERVER['HTTP_HOST'] . $_SERVER['PHP_SELF'];
 $client = new Google_Client();
-$client->setClientId('Insert Client ID');
-$client->setClientSecret('Insert Client Secret');
-$client->setRedirectUri('urn:ietf:wg:oauth:2.0:oob');
-$client->setScopes(array('https://www.googleapis.com/auth/drive'));
-$client->setUseObjects(true);
+$client->setAuthConfigFile('client_secrets.json');
+$client->addScope(Google_Service_Drive::DRIVE);
+$client->setRedirectUri($redirect_uri);
+$client->setAccessType('offline');
 
-$service = new Google_DriveService($client);
+if (isset($_GET['code'])) {
+    $client->authenticate($_GET['code']);
+    $_SESSION['access_token'] = $client->getAccessToken();
+    header('Location: ' . filter_var($redirect_uri, FILTER_SANITIZE_URL));
+}
 
-$authUrl = $client->createAuthUrl();
+if (isset($_SESSION['access_token']) && $_SESSION['access_token']) {
+    $client->setAccessToken($_SESSION['access_token']);
+    if ($client->isAccessTokenExpired()) {
+        $tokens_decoded = json_decode($_SESSION['access_token']);
+        $refreshToken = $tokens_decoded->refresh_token;
+        $client->refreshToken($refreshToken);
+        $_SESSION['access_token'] = $client->getAccessToken();
+    }
 
-//Request authorization
-print "Please visit:\n$authUrl\n\n";
-print "Please enter the auth code:\n";
-$authCode = trim(fgets(STDIN));
-
-// Exchange authorization code for access token
-$accessToken = $client->authenticate($authCode);
-$client->setAccessToken($accessToken);
-
-\GoogleDriveStreamWrapper::setSrvice($service);
-\GoogleDriveStreamWrapper::registerWrapper();
+    $service = new Google_Service_Drive($client);
+    \GoogleDriveStreamWrapper::setSrvice($service);
+    \GoogleDriveStreamWrapper::registerWrapper();
+} else {
+    $auth_url = $client->createAuthUrl();
+    header('Location: ' . filter_var($auth_url, FILTER_SANITIZE_URL));
+}
 
 var_dump(mkdir('gdrive://aaa'));
 var_dump(mkdir('gdrive://aaa/bbb2'));
 var_dump(rename('gdrive://aaa/bbb2', 'gdrive://aaa/bbb3'));
 var_dump(rmdir('gdrive://aaa/bbb3'));
-
 var_dump(mkdir('gdrive://aaa/bbb4'), is_dir('gdrive://aaa/bbb4'), is_file('gdrive://aaa/bbb4'));
 
 $path = 'gdrive://aaa/bbb4/' . date('Y-m-d-H-i-s') . '.txt';

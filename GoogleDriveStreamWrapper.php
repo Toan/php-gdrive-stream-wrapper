@@ -2,22 +2,22 @@
 // vim: set ts=4 sw=4 sts=4 et:
 
 /**
- * Google drive stream wrapper 
+ * Google drive stream wrapper
  */
-class GoogleDriveStreamWrapper 
+class GoogleDriveStreamWrapper
 {
 
     /**
-     * Directory separator 
+     * Directory separator
      */
     const DS = '/';
 
     /**
      * Wrapper scheme
      */
-	const SCHEME = 'gdrive';
+    const SCHEME = 'gdrive';
 
-	const TYPE_ANY       = 'any';
+    const TYPE_ANY       = 'any';
     const TYPE_DIRECTORY = 'dir';
     const TYPE_FILE      = 'file';
 
@@ -25,8 +25,8 @@ class GoogleDriveStreamWrapper
 
     /**
      * Google drive service object
-     * 
-     * @var   \Google_DriveService
+     *
+     * @var   \Google_Service_Drive
      */
     protected static $service;
 
@@ -46,12 +46,12 @@ class GoogleDriveStreamWrapper
 
     /**
      * Set Google drive service object
-     * 
-	 * @param \Google_DriveService $service Google drive service object
-     *  
+     *
+     * @param \Google_Service_Drive $service Google drive service object
+     *
      * @return void
      */
-    public static function setSrvice(\Google_DriveService $service)
+    public static function setSrvice(\Google_Service_Drive $service)
     {
         static::$service = $service;
     }
@@ -86,10 +86,10 @@ class GoogleDriveStreamWrapper
      *
      * @return void
      */
-	public static function registerWrapper()
-	{
-		stream_wrapper_register(static::SCHEME, get_called_class());
-	}
+    public static function registerWrapper()
+    {
+        stream_wrapper_register(static::SCHEME, get_called_class());
+    }
 
     // }}}
 
@@ -115,32 +115,31 @@ class GoogleDriveStreamWrapper
     /**
      * Google drive root file (cache)
      *
-     * @var   \Google_DriveFile
+     * @var   \Google_Service_Drive
      */
     protected $root;
 
     /**
      * Get Google drive root file
      *
-     * @return \Google_DriveFile
+     * @return \Google_Service_Drive
      */
     protected function getRoot()
     {
         if (!isset($this->root)) {
             $this->root = static::$service->files->get(static::$service->about->get()->getRootFolderId());
         }
-
         return $this->root;
     }
 
     /**
      * Check - specified file is file or directory
      *
-     * @param \Google_DriveFile $file File
+     * @param \Google_Service_Drive_DriveFile $file File
      *
      * @return boolean
      */
-    protected function isDir(\Google_DriveFile $file)
+    protected function isDir(\Google_Service_Drive_DriveFile $file)
     {
         return 'application/vnd.google-apps.folder' == $file->getMimetype();
     }
@@ -175,7 +174,7 @@ class GoogleDriveStreamWrapper
      * @param string $path Short path
      * @param string $type Item type OPTIONAL
      *
-     * @return \Google_DriveFile
+     * @return \Google_Service_Drive_DriveFile
      */
     protected function getItemByPath($path, $type = self::TYPE_ANY)
     {
@@ -202,20 +201,21 @@ class GoogleDriveStreamWrapper
     /**
      * Get subitems by file
      *
-     * @param \Google_DriveFile $file File
+     * @param \Google_Service_Drive_DriveFile $file File
      * @param string            $type Item type OPTIONAL
      *
-     * @return \Google_DriveFile
+     * @return \Google_Service_Drive_DriveFile
      */
-    protected function getSubitems(\Google_DriveFile $file, $type = self::TYPE_ANY)
+    protected function getSubitems(\Google_Service_Drive_DriveFile $file, $type = self::TYPE_ANY)
     {
-		$q = '"' . $file->getId() . '" in parents';
-		if (static::TYPE_DIRECTORY == $type) {
-			$q .= ' and mimeType = "application/vnd.google-apps.folder"';
+        $q = '"' . $file->getId() . '" in parents';
+        if (static::TYPE_DIRECTORY == $type) {
+            $q .= ' and mimeType = "application/vnd.google-apps.folder"';
 
-		} elseif (static::TYPE_FILE == $type) {
+        } elseif (static::TYPE_FILE == $type) {
             $q .= ' and mimeType != "application/vnd.google-apps.folder"';
-		}
+        }
+
 
         return static::$service
             ->files
@@ -230,7 +230,7 @@ class GoogleDriveStreamWrapper
     /**
      * Current directory
      *
-     * @var   \Google_DriveFile
+     * @var   \Google_Service_Drive_DriveFile
      */
     protected $dir;
 
@@ -314,7 +314,7 @@ class GoogleDriveStreamWrapper
     /**
      * mkdir() wrapper
      *
-     * @param string  $path    Directory patrh
+     * @param string  $path    Directory path
      * @param integer $mode    Permission mode
      * @param integer $options Options
      *
@@ -325,8 +325,8 @@ class GoogleDriveStreamWrapper
         $dir = $this->getRoot();
         $parts = explode(static::DS, $this->convertPathToFS($path));
         array_shift($parts);
-		$length = count($parts);
-		$lastPath = array();
+        $length = count($parts);
+        $lastPath = array();
         foreach ($parts as $i => $part) {
             $found = false;
             foreach ($this->getSubitems($dir, static::TYPE_DIRECTORY) as $item) {
@@ -335,15 +335,15 @@ class GoogleDriveStreamWrapper
                 }
             }
 
-			$lastPath[] = $part;
+            $lastPath[] = $part;
 
             if ($found) {
                 $dir = $found;
 
             } elseif ($length == $i + 1 || $options & STREAM_MKDIR_RECURSIVE) {
-                $ref = new \Google_ParentReference;
+                $ref = new \Google_Service_Drive_ParentReference();
                 $ref->setId($dir->getId());
-                $dir = new \Google_DriveFile();
+                $dir = new \Google_Service_Drive_DriveFile();
                 $dir->setTitle($part);
                 $dir->setMimeType('application/vnd.google-apps.folder');
                 $dir->setParents(array($ref));
@@ -354,7 +354,7 @@ class GoogleDriveStreamWrapper
                     )
                 );
 
-				chmod($this->convertPathToURL('/' . implode(static::DS, $lastPath)), $mode);
+                chmod($this->convertPathToURL('/' . implode(static::DS, $lastPath)), $mode);
             }
         }
 
@@ -396,7 +396,7 @@ class GoogleDriveStreamWrapper
     /**
      * Current file
      *
-     * @var   \Google_DriveFile
+     * @var   \Google_Service_Drive_DriveFile
      */
     protected $file;
 
@@ -448,11 +448,11 @@ class GoogleDriveStreamWrapper
         } elseif (!$file && 'r' != substr($mode, 0, 1)) {
             $dir = $this->getItemByPath(dirname($this->convertPathToFS($path)), static::TYPE_DIRECTORY);
             if ($dir) {
-                $file = new \Google_DriveFile();
+                $file = new \Google_Service_Drive_DriveFile();
                 $file->setTitle(basename($this->convertPathToFS($path)));
                 $file->setMimeType($this->detectMimetype($path));
 
-                $ref = new \Google_ParentReference;
+                $ref = new \Google_Service_Drive_ParentReference();
                 $ref->setId($dir->getId());
                 $file->setParents(array($ref));
             }
@@ -494,7 +494,6 @@ class GoogleDriveStreamWrapper
     public function stream_write($data)
     {
         $size = 0;
-
         if ('r' != substr($this->fileMode, 0, 1)) {
             $this->downloadFile();
 
@@ -508,8 +507,8 @@ class GoogleDriveStreamWrapper
             $this->filePosition += strlen($data);
 
             $this->file = $this->file->getId()
-                ? static::$service->files->update($this->file->getId(), $this->file, array('data' => $this->fileBody, 'mimeType' => $this->detectMimetype($this->filePath)))
-                : static::$service->files->insert($this->file, array('data' => $this->fileBody, 'mimeType' => $this->detectMimetype($this->filePath)));
+                ? static::$service->files->update($this->file->getId(), $this->file, array('data' => $this->fileBody, 'mimeType' => $this->detectMimetype($this->filePath), 'uploadType' => 'multipart'))
+                : static::$service->files->insert($this->file, array('data' => $this->fileBody, 'mimeType' => $this->detectMimetype($this->filePath), 'uploadType' => 'multipart'));
 
             $size = strlen($data);
         }
@@ -543,7 +542,7 @@ class GoogleDriveStreamWrapper
                 break;
 
             case SEEK_CUR:
-				$this->filePosition += $whence;
+                $this->filePosition += $whence;
                 break;
 
             case SEEK_END:
@@ -553,7 +552,7 @@ class GoogleDriveStreamWrapper
             default:
         }
 
-		$this->filePosition = max(0, min($this->filePosition, $this->file->getFilesize()));
+        $this->filePosition = max(0, min($this->filePosition, $this->file->getFilesize()));
 
         return true;
     }
@@ -666,12 +665,13 @@ class GoogleDriveStreamWrapper
     {
         if (!isset($this->fileBody)) {
             if (in_array(substr($this->fileMode, 0, 1), array('r', 'c', 'a'))) {
-                $request = new \Google_HttpRequest($this->file->getDownloadUrl(), 'GET', null, null);
-                $httpRequest = \Google_Client::$io->authenticatedRequest($request);
-                if ($httpRequest->getResponseHttpCode() == 200) {
-                    $this->fileBody = $httpRequest->getResponseBody();
+                $httpClient = new GuzzleHttp\Client();
+                static::$service->getClient()->authorize($httpClient);
+                $request = $httpClient->createRequest('GET', $this->file->getDownloadUrl());
+                $response = $httpClient->send($request);
+                if ($response->getStatusCode() == 200) {
+                    $this->fileBody = $response->getBody();
                 }
-
                 if ('a' == substr($this->fileMode, 0, 1)) {
                     $this->filePosition = strlen($this->fileBody);
                 }
@@ -691,10 +691,10 @@ class GoogleDriveStreamWrapper
      *
      * @return string
      */
-	protected function detectMimetype($path)
-	{
-		return empty(static::$mimes[$path]) ? 'text/plain' : static::$mimes[$path];
-	}
+    protected function detectMimetype($path)
+    {
+        return empty(static::$mimes[$path]) ? 'text/plain' : static::$mimes[$path];
+    }
 
     // }}}
 
@@ -718,7 +718,7 @@ class GoogleDriveStreamWrapper
             $parentTo = dirname($this->convertPathToFS($path_to));
             mkdir($this->convertPathToURL($parentTo));
             $from->setTitle(basename($this->convertPathToFS($path_to)));
-            $ref = new \Google_ParentReference;
+            $ref = new \Google_Service_Drive_ParentReference();
             $parentToFile = $this->getItemByPath($parentTo);
             $ref->setId($parentToFile->getId());
             $from->setParents(array($ref));
@@ -762,7 +762,7 @@ class GoogleDriveStreamWrapper
             switch ($option) {
                 case STREAM_META_TOUCH:
                     static::$service->files->update($file->getId(), $file, array('setModifiedDate' => true, 'updateViewedDate' => true));
-					$result = true;
+                    $result = true;
                     break;
 
                 case STREAM_META_OWNER_NAME:
@@ -855,10 +855,10 @@ class GoogleDriveStreamWrapper
      *
      * @return resource
      */
-	public function stream_cast($cast_as)
-	{
-		return false;
-	}
+    public function stream_cast($cast_as)
+    {
+        return false;
+    }
 
     /**
      * stream_set_blocking() / stream_set_timeout() / stream_set_write_buffer() wrapper
@@ -870,19 +870,19 @@ class GoogleDriveStreamWrapper
      *
      * @return boolean
      */
-	public function stream_set_option($option, $arg1, $arg2)
-	{
-		return false;
-	}
+    public function stream_set_option($option, $arg1, $arg2)
+    {
+        return false;
+    }
 
     /**
      * Get file statistics
      *
-     * @param \Google_DriveFile $file File
+     * @param \Google_Service_Drive_DriveFile $file File
      *
      * @return array
      */
-    protected function getStat(\Google_DriveFile $file)
+    protected function getStat(\Google_Service_Drive_DriveFile $file)
     {
         $result = array(
             0,
